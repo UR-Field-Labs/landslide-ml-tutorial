@@ -1,0 +1,173 @@
+---
+title: "Landslide data preparation"
+author: "Indraneel Kasmalkar"
+date: "19-05-2024"
+output: html_notebook
+---
+
+# Introduction
+
+This notebook is a data preparation script to generate landslide and terrain data. The script is targeted for the Nepal bounding box, but can be modified for any region so long as the relevant input data are used.
+
+The script uses the Global Landslide Catalog (https://svs.gsfc.nasa.gov/4710) to identify landslide points.
+The script uses MERIT DEM (https://hydro.iis.u-tokyo.ac.jp/~yamadai/MERIT_DEM/) to generate slope, elevation, curvature and contributing area variables.
+
+### Load modules
+
+```{r install, include = FALSE}
+packages <- c('caret', 'rattle', 'randomForest', 'lubridate', 'readr', 'raster', 'geosphere','tidyr', 'dplyr', 'whitebox') 
+
+# Function to install packages only if they are not already installed
+install_if_not_installed <- function(packages) {
+  for (package in packages) {
+    if (!require(package, character.only = TRUE, quietly = TRUE)) {
+      install.packages(package, dependencies = TRUE)
+      library(package, character.only = TRUE)
+    }
+  }
+}
+
+# Call the function with your list of packages
+install_if_not_installed(packages)
+
+for (package in packages) {
+  library(package, character.only = TRUE)
+}
+```
+
+### Fetch data
+
+We load the landslide data from the Global Landslide Catlogue, stored in the data folder.
+
+We use the MERIT digital elevation data (90m resolution) to generate the terrain characteristics. The MERIT data is quite large in size for Github to handle. You can find a copy on the Field Lab 2024 Google Drive (https://drive.google.com/file/d/1DY0CdKYxHBihg7E98MU5kPJExuwK0SFh/view?usp=drive_link). Copy and paste it in the data/terrain folder.  
+
+```{r fetch_data}
+
+#Load global landslide catalog
+landslides = read_csv('data/global_landslide_catalog.csv')
+
+#Load dem.
+dem_file <- "data/terrain/nepal_merit_dem.tif"  # Replace with the path to your DEM file
+
+# Define output file paths
+slope_file <- "data/terrain/slope.tif"
+aspect_file <- "data/terrain/aspect.tif"
+profile_curvature_file <- "data/terrain/cprof.tif"
+plan_curvature_file <- "data/terrain/cplan.tif"
+flow_accumulation_file <- "data/terrain/contributing_area.tif"
+
+#Nepal bounding box. xmin, ymin, xmax, ymax.
+
+box <- c(80.0884245137, 26.3978980576, 88.1748043151, 30.4227169866)
+bbox <- list(xmin = box[1], ymin = box[2], xmax = box[3], ymax = box[4])
+
+```
+### Create a landslide dataset
+
+We process the global landslide catalog. We first subset the data to the Nepal bounding box. Then we generate random points in the bounding box which do not correspond to landslides, and we make sure they are at least 50 km away from the landslide points. We generate 3x the number of non-landslide points as landslide ones.
+
+```{r landslides_df}
+
+set.seed(10)
+
+df <- data.frame(subset(landslides, latitude >= bbox$ymin & latitude <= bbox$ymax & 
+                      longitude >= bbox$xmin & longitude <= bbox$xmax))
+
+#Set landslide indicator to 1.
+df$landslides = 1
+
+#Number of samples
+num_points <- nrow(df)*3
+
+#minimum distance away from existing points
+min_distance <- 100
+
+is_too_close <- function(lat, lon, existing_points, min_distance) {
+  distances <- distm(matrix(c(lon, lat), ncol = 2), existing_points[, c("longitude", "latitude")], fun = distHaversine)
+  return(any(distances < min_distance))
+}
+
+# Generate random points within the bounding box for which we record no landslides. We need to make sure they are far from the landslide points.
+random_points <- data.frame(
+  longitude = runif(num_points*3, bbox$xmin, bbox$xmax),
+  latitude = runif(num_points*3, bbox$ymin, bbox$ymax)
+)
+
+random_points$landslides = 0
+random_points['landslide_trigger'] = 'None'
+
+# Filter random points to remove those that are too close to existing points
+filtered_random_points <- random_points %>% filter(!is_too_close(.$latitude, .$longitude, df, min_distance))
+
+# Choose a certain number of points from the filtered list
+selected_points <- sample_n(filtered_random_points, num_points)
+
+# Print the selected points
+print(selected_points)
+
+df = rbind(df[c('landslides', 'latitude', 'longitude', 'landslide_trigger')], selected_points)
+ 
+```
+
+
+### Generate terrain characteristics
+
+We use the whitebox package to generate slope, aspect, profile curvature, planar curvature, and contributing area from the DEM.
+
+```{r dem_analysis}
+
+# Compute Slope
+wbt_slope(dem_file, output = slope_file)
+
+# Compute aspect
+wbt_aspect(dem_file, output= aspect_file)
+
+
+# Compute profile curvature
+wbt_profile_curvature(dem_file, output= profile_curvature_file)
+
+# Compute plan curvature
+wbt_plan_curvature(dem_file, output= plan_curvature_file)
+
+
+# Compute flow accumulation
+wbt_d8_flow_accumulation(dem_file, flow_accumulation_file)
+
+```
+
+We now add the data to df based on latitude/longitude. We then store it as landslide_nepal.csv.
+
+```{r add_data}
+
+#Load the rasters.
+dem = raster(dem_file)
+slope = raster(slope_file)
+aspect = raster(aspect_file)
+cprof = raster(profile_curvature_file)
+cplan = raster(plan_curvature_file)
+carea = raster(flow_accumulation_file)
+
+
+#Find the values at the latitude and longitude and save them.
+
+df$elev = raster::extract(dem, cbind(df$longitude, df$latitude))
+
+#Normalize elevation
+df$norm_elev = df$elev/cellStats(dem, 'max')
+
+#Slope, aspect, curvature, contributing area (log)
+df$slope = raster::extract(slope, cbind(df$longitude, df$latitude))
+df$aspect = raster::extract(aspect, cbind(df$longitude, df$latitude))
+df$cprof = raster::extract(cprof, cbind(df$longitude, df$latitude))
+df$cplan = raster::extract(cplan, cbind(df$longitude, df$latitude))
+df$log10_carea = log(raster::extract(carea, cbind(df$longitude, df$latitude)))
+
+#Write the dataset.
+write.csv(df, file = 'data/landslide_nepal.csv')
+```
+
+# Conclusion
+
+In this R notebook, we have generated a landslide dataset using the global landslide catalog and terrain characteristics.
+
+
