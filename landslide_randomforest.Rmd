@@ -1,0 +1,317 @@
+---
+title: "Random Forest Tutorial: Nepal Landslide Edition"
+author: "Neel Kasmalkar"
+date: "19/5/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This tutorial walks you through the development of a random forest model to predict landslides in Nepal. The tuturial serves as Part 2. If you haven't already checked it out, please take a look at the Logistic Regression tutorial, landslide_logistic_regression.Rmd.
+
+The dataset of landslides is prepared from the Global Landslide Catalogue, and terrain characteristics such as slope, elevation, profile curvature, plan curvature and flow accumulation area (contributing area), along with a historical landslide 0/1 indicator. We will see that even with just terrain characteristics, we can build a good random forest model to predict landslides.
+
+### Download necessary packages
+Just run this code to download the various packages. The code is not really relevant to AI/ML.
+
+```{r install, include = FALSE}
+packages <- c('caret', 'rattle', 'ranger', 'raster','spatstat')
+
+# Function to install packages only if they are not already installed
+install_if_not_installed <- function(packages) {
+  for (package in packages) {
+    if (!require(package, character.only = TRUE, quietly = TRUE)) {
+      install.packages(package, dependencies = TRUE)
+      library(package, character.only = TRUE)
+    }
+  }
+}
+
+# Call the function with your list of packages
+install_if_not_installed(packages)
+
+```
+
+
+### Load data and plot slope and landslide occurrence
+
+Let us load landslide data and do some basic viewing. We only select rainfall induced landslides.
+
+```{r landslide_data}
+#Fix randomization
+set.seed(10)
+
+df = read.csv('data/landslide_nepal.csv')
+
+#View the data. We have latitude, longitude, slope, plan curvature, profile curvature, elevation, contributing area (log), landslide_trigger, and landslide (0 or 1 binary).
+#Uncomment to run.
+#View(df)
+
+# Subset to rainfall-induced landslides.
+df = df[df$landslide_trigger %in% c('monsoon', 'downpour', 'continuous_rain','rain', 'None'),]
+
+```
+
+
+###Training and testing
+
+Recall from the logistic regression tutorial that it is really important to split your data into training and testing. By measuring performance on separate testing data, we ensure that we are not overfitting to the training data.
+
+```{r train_test}
+
+#Fix randomization
+set.seed(10)
+
+#Length of the dataset
+n = nrow(df)
+
+#Put 75% of data as training, and rest as testing.
+#First, collect 75% of the rows randomly.
+
+train_indices <- sample(seq_len(n), size = floor(0.75 * n))
+
+#Training data
+df_train = df[train_indices,]
+
+#Remaining is testing data
+df_test = df[-train_indices,]
+
+
+```
+
+
+# Logistic regression
+
+Since we are experts in logistic regression already, let us first try out a logistic regression model for the Nepal landslides.
+
+```{r landslide_glm}
+
+#Develop the landslide GLM with all variables from the training dataset
+g = glm(landslides ~ slope + cplan + cprof + norm_elev + log10_carea, data = df_train, family = binomial('logit'))
+
+#Predict the values on the test dataset
+pred = predict(g, newdata = df_test, type = "response")
+
+#Print the confusion table.
+confusion_table <- table(as.factor(df_test$landslides == 1),as.factor(pred > 0.5), dnn=c("Observed","Predicted"))
+
+print('Landslide logistic regression:')
+
+print.table(confusion_table)
+
+
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[1,2]), digits = 2)
+recall = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[2,1]), digits = 2)
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+```
+As you can see, this is an okay model. Precision is greater than 50%, but recall is a bit poor.
+
+
+# Random forest model
+
+Random Forests are perhaps the best machine learning models out there when you account for both performance and ease of development. The idea starts with a decision tree. You give a computer some landslide data, and it can generate a good decision tree (if else questions) to identify landslides. Now, yo ugiive the computer different subsets of the data, and it generates 1000s of decision trees. Collectively this is a random forest. When you provide input data to the random forest, it feeds the data to each decision tree, and obtains each decision tree's vote on landslide or no landslide. The random forest returns the popular vote of all decision trees.
+
+
+```{r landslide_rf}
+set.seed(10)
+
+#Depth of tree. The greater the depth, the more complex your decision trees are.
+max_depth = 10
+
+#How many decision trees should be made?
+ntree = 1000
+
+#Create the random forest
+rf = ranger(landslides ~  slope + cplan + cprof + norm_elev + log10_carea, data = df_train, num.trees = ntree, max.depth = max_depth, classification = TRUE)
+
+
+#Predict the values on the test dataset
+pred_rf = predict(rf, data = df_test)
+pred = as.numeric(pred_rf$predictions)
+
+#Print the confusion table.
+confusion_table <- table(as.numeric(df_test$landslides),as.numeric(pred), dnn=c("Observed","Predicted"))
+
+print('Landslide random forest:')
+
+print.table(confusion_table)
+
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[1,2]), digits = 2)
+recall = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[2,1]), digits = 2)
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+```
+You can see that the random forest is quite better than the logistic regression. Random forests are better at handling non-linear relationships, and are in general, quite robust. But they require some hyperparameter tuning.
+
+### Hyperparameters
+
+Unlike logistic regression, you have to set some hyperparameters for a random forest. The hyperparameters determine how big and how complex you want the random forest to be. The bigger the random forest, the smaller the uncertainty. The more complex your data, the more complex your random forest should be. However, if your random forest is too complex, you might end up overfitting.
+
+ntree: How many decision trees do you want? More decision trees reduce uncertainty, but add to computation time.
+max.depth: How deep should decision trees be? This means that they have more if/else questions in them, making them complex.
+
+Go back to the last code black and play with these hyperparameters to see if you can get better performance. What happens if you reduce max.depth to 2? What happens if you increase max.depth to 100? 
+
+# Create a landslide susceptility map.
+
+Armed with the random forest model, let us generate a landslide susceptibility map. To do so, we will need to run our new random forest model on every pixel of Nepal. But first, we need the relevant elevation, slope, curvature etc. for all pixels of the Nepal region. Those files are too big to fit within Github. Please download them from the Google Drive (https://drive.google.com/drive/folders/1wQVe3R0crlsPQ_8F_FbbBtGuGeRPaYEF) into data/terrain/ folder.
+
+Then, run the following code.
+
+```{r plotter}
+
+dem_file <- "data/terrain/nepal_merit_dem.tif"
+
+# Define output file paths
+slope_file <- "data/terrain/slope.tif"
+aspect_file <- "data/terrain/aspect.tif"
+profile_curvature_file <- "data/terrain/cprof.tif"
+plan_curvature_file <- "data/terrain/cplan.tif"
+flow_accumulation_file <- "data/terrain/contributing_area.tif"
+
+#Load the files
+dem = raster(dem_file)
+max_val = cellStats(dem,'max')
+
+slope = raster(slope_file)
+aspect = raster(aspect_file)
+cprof = raster(profile_curvature_file)
+cplan = raster(plan_curvature_file)
+carea = raster(flow_accumulation_file)
+
+#We reduce the resolution of the DEM by a factor of 5 to increase computation speed.
+dem = aggregate(dem, fact = 4, method = 'mean')
+
+full_df <- as.data.frame(dem, xy = TRUE)
+colnames(full_df) <- c('longitude', 'latitude', 'elev')
+xy <- cbind(full_df$longitude, full_df$latitude)
+full_df$norm_elev = full_df$elev/max_val
+full_df$slope = raster::extract(slope, xy)
+full_df$aspect = raster::extract(aspect, xy)
+full_df$cprof = raster::extract(cprof, xy)
+full_df$cplan = raster::extract(cplan, xy)
+full_df$log10_carea = log(raster::extract(carea, xy))
+
+#Take only the non-NA values for the full landslide data, and run the random forest model.
+full_df = na.omit(full_df)
+value = predict(rf, data = full_df)
+full_df$value = as.numeric(value$predictions)
+
+#Create a subdataframe with just latitude, longitude and value (0,1 prediction of model).
+subdf = full_df[c('longitude', 'latitude', 'value')]
+colnames(subdf) = c('x', 'y', 'value')
+
+#Create the window for developing susceptibility map.
+win <- owin(xrange = c(80.0884245137, 88.1748043151), yrange = c(26.3978980576, 30.4227169866))
+
+# Convert to ppp object and then develop a density map.
+yesdf = subdf[subdf$value == 1,]
+points_ppp <- ppp(yesdf$x, yesdf$y, window = win)
+
+kde <- density(points_ppp, sigma = 0.05)  # Adjust sigma as needed for smoothing
+
+#Normalize kde values
+
+
+kde_matrix <- as.matrix(kde)
+kde_matrix <- kde_matrix[nrow(kde_matrix):1, ]
+
+# Create a raster object from the matrix
+kde_raster <- raster(kde_matrix)
+kde_raster = kde_raster/cellStats(kde_raster,'max')
+
+# Define the extent of the raster
+extent(kde_raster) <- extent(c(80.0884245137, 88.1748043151, 26.3978980576, 30.4227169866))
+crs(kde_raster) <- CRS("+proj=longlat +datum=WGS84")
+writeRaster(kde_raster, filename = "output/landslide_susceptibility.tif", format = "GTiff", overwrite = TRUE)
+```
+
+You can now open the output/landslide_susceptibility.tif in QGIS and decorate it!
+
+# Add more data to the random forest model
+
+The following script shows how to add precipitation data to the existing landslide data. The procedure is simple. 
+
+1. Find the raster data you like.
+2. Use th extract function to get the data at the relevant latitude/longitude.
+3. Retrain the random forest model.
+
+### Add precipitation data
+
+Here we use 3 precipitation datasets.
+
+1. Global mean annual precipitation data (mm) from the CHIRPS dataset (https://www.chc.ucsb.edu/data/chirps).
+2. Global mean annual precipitation via isotope data from the WaterIsotopes dataset (https://wateriso.utah.edu/waterisotopes/pages/data_access/ArcGrids.html).
+3. Global standard deviation of annual precipitation via isotope data from the WaterIsotopes dataset (https://wateriso.utah.edu/waterisotopes/pages/data_access/ArcGrids.html).
+
+```{r add_precipitation}
+
+#Water isotope mean
+prec = raster('data/d2h_MA.tif')
+
+#Water isotope standard deviation
+prec_se = raster('data/d2h_se_MA.tif')
+
+#CHIRPS global mean precipitation
+chirps = raster('data/chirps_1981-2023.tif')
+
+#Extract data to specific points in dataset.
+df_train$prec = raster::extract(prec, cbind(df_train$longitude, df_train$latitude))
+df_test$prec = raster::extract(prec, cbind(df_test$longitude, df_test$latitude))
+df_train$chirps = raster::extract(chirps, cbind(df_train$longitude, df_train$latitude))
+df_test$chirps = raster::extract(chirps, cbind(df_test$longitude, df_test$latitude))
+df_train$prec_se = raster::extract(prec_se, cbind(df_train$longitude, df_train$latitude))
+df_test$prec_se = raster::extract(prec_se, cbind(df_test$longitude, df_test$latitude))
+
+set.seed(10)
+
+#Depth of tree
+max_depth = 8
+
+#How many decision trees should be made?
+ntree = 1000
+
+#Generate random forest model.
+rf = ranger(landslides ~  slope + cplan + cprof + norm_elev + log10_carea + prec + prec_se + chirps, data = df_train, num.trees = ntree, max.depth = max_depth, classification = TRUE)
+
+
+#Predict the values on the test dataset
+pred_rf = predict(rf, data = df_test)
+pred = as.numeric(pred_rf$predictions)
+
+#Print the confusion table.
+confusion_table <- table(as.numeric(df_test$landslides),as.numeric(pred), dnn=c("Observed","Predicted"))
+
+print('Landslide random forest with precipitation:')
+
+print.table(confusion_table)
+
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[1,2]), digits = 2)
+recall = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[2,1]), digits = 2)
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+```
+We see that there is a slight increase in all three performance metrics.
+
+# Conclusion
+
+In this R notebook, we have developed a good random forest model for Nepal, one that outperforms the logistic regression model. We learnt about hyperparameters, and how to adjust our random forest model for better performance. Finally, we added precipitation data from a raster and improved model performance.
+
+This is the take-off point for your own projects:
+1. What other datasets can be added to further improve the random forest model?
+2. Can you change the landslide trigger and try the same approach for earthquake-triggered landslides?
+3. How can we alter the random forest model to work for other hazards, like forest fires?
