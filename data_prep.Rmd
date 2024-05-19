@@ -168,6 +168,6 @@ write.csv(df, file = 'data/landslide_nepal.csv')
 
 # Conclusion
 
-In this R notebook, we have generated a landslide dataset using the global landslide catalog and terrain characteristics.
+In this R notebook, we have generated a landslide dataset using the global landslide catalog and terrain characteristics. You can edit the code to develop datasets for different regions and/or different hazards.
 
 
