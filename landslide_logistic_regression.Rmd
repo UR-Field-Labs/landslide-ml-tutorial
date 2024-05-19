@@ -1,0 +1,246 @@
+---
+title: "Logistic Regression Tutorial: Landslide Edition"
+author: "Neel Kasmalkar"
+date: "19/05/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This tutorial walks you through the running of a logistic regression model to predict landslides in Ecuador.
+The dataset of landslides is prepared by the The Brenning et al. team [https://cran.r-project.org/web/packages/RSAGA/vignettes/RSAGA.html].
+
+The dataset only includes terrain characteristics such as slope, elevation, profile curvature, plan curvature and flow accumulation area (contributing area), along with a historical landslide 0/1 indicator. We will see that even with just terrain characteristics, we can build a reasonable model to predict landslides.
+
+### Download necessary packages
+Just run this code to download the various packages that we will use. The code is not really relevant to AI/ML.
+
+```{r install, include = FALSE}
+install.packages('readr')
+library(readr)
+
+```
+
+# Landslide data
+
+Let us load landslide data and do some basic viewing.
+
+### Load data and plot slope and landslide occurrence
+
+```{r landslide_data}
+#Fix randomization
+set.seed(10)
+
+df = read.csv('data/landslide_ecuador.csv')
+
+#View the data. We have x, y coordinates, slope, plan curvature, profile curvature, elevation, contributing area (log), and landslide (0 or 1 binary).
+#Uncomment to run.
+#View(df)
+
+```
+
+Let's plot landslide against (normalized) elevation. We can intuitively say that landslides are likely in mountainous regions, which are higher in elevation. We should see that in the image below
+
+```{r landslide vs elevation}
+
+
+#Check how elevation affects landslides
+plot(df$norm_elev, df$landslides, main = 'Landslide vs Elevation', xlab = 'Elevation (normalized)', ylab = 'Landslide', xlim = c(0.0, 2.0))
+
+```
+
+# Logistic Regression: put a curve through that data!
+
+After that, let's see the magic of logistic regression in finding a pattern in the data.
+
+In image below, for a (normalized) elevation of 1 what probability of landslide does the model give?
+
+```{r log_regression}
+
+#Lot of jargon, but logistic regression is a GLM model with a logit function. 
+#It will help find a pattern between landslide occurrence and elevation
+#Use line below to set up logistic regression of landslide as a function of elev.
+#The target variable has to be 0,1 variable.
+g = glm(landslides ~ norm_elev, data = df, family = binomial('logit'))
+
+#Let's plot model output against general elevation.
+prediction_df = data.frame(norm_elev = seq(-1, 2, 0.01))
+predicted = predict(g,newdata = prediction_df, type = "response")
+
+#Plot the actual data
+plot(df$norm_elev, df$landslides, main = 'Landslides vs Elevation', xlab = 'Elevation (normalized)', ylab = 'Landslide', xlim = c(0,2))
+
+#Plot the model prediction per elevation.
+lines(prediction_df$norm_elev, predicted, col = 'red')
+
+```
+This above is a very basic model, and as you can see, it is not a great fit. But it is a good start. What we need is more data, more variables. But first...
+
+### Training and testing
+
+When you fit a model to certain data, that is called training. The hope is that the model learns patterns from the data.
+But data has noise. Sometimes a model learns the noise rather than the pattern. It then becomes useless in the real world.
+So we split our data into two pieces. Training data and testing data.
+We fit the model on the training data. 
+We test its performance on the testing data.
+
+```{r train_test}
+
+#Fix randomization
+set.seed(10)
+
+#Length of the dataset
+n = nrow(df)
+
+#Put 75% of data as training, and rest as testing.
+#First, collect 75% of the rows randomly.
+train_indices <- sample(seq_len(n), size = floor(0.75 * n))
+
+#Training data
+df_train = df[train_indices,]
+
+#Remaining is testing data
+df_test = df[-train_indices,]
+
+
+#Now we train on df_train, and plot for df_test.
+g = glm(landslides ~ norm_elev, data = df_train, family = binomial('logit'))
+
+#Let's plot model output against general elevation.
+prediction_df = data.frame(norm_elev = seq(-1, 2, 0.01))
+predicted = predict(g,newdata = prediction_df, type = "response")
+
+#Plot the actual data
+plot(df_test$norm_elev, df_test$landslides, main = 'Landslides vs Elevation', xlab = 'Elevation (normalized)', ylab = 'Landslide', xlim = c(0,2))
+
+#The summary shows the coefficient and intercept for computing the probability
+summary(g)
+
+#Plot the model prediction per elevation.
+lines(prediction_df$norm_elev, predicted, col = 'red')
+
+
+
+```
+
+
+###How do I measure model performance?
+
+This type of model is called a classifier model. It takes input and provides a probability of Yes (yes = landslide in this case). We generally assign anything with probability greater than 0.5 as a YES from the model (although you can choose where to set the threshold).
+
+For a classifier model, there are three importance metrics:
+
+1. accuracy: how many answers does the model get it right?
+2. precision: for all the times the model says YES, how many of them are correct? (i.e. how precision is the model in saying YES)
+3. recall: for all the data points where the answer is YES, how many times does the model get it right? (i.e. how many times the model can correctly recall YES)
+
+Can you compute precision and recall from this confusion table? Accuracy is done below.
+
+NOTE: only the performance metrics for the testing data matter.
+
+
+```{r metrics}
+
+#Get the answers for the testing data:
+pred = predict(g,newdata = df_test, type = "response")
+
+print('Landslide vs elevation Logistic regression:')
+
+#Print the confusion table of observed vs predicted.
+confusion_table <- table(as.factor(df_test$landslides == 1),as.factor(pred > 0.5), dnn=c("Observed","Predicted"))
+print.table(confusion_table)
+
+                            
+
+#EXERCISE: write code for accuracy, precision, recall.
+
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = 'EXERCISE'
+recall = 'EXERCISE'
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+
+```
+So the model has great accuracy, and it has perfect precision: so when it says there is high probability of landslide, then it is probably true. However, it's recall is terrible. So there are many places that are landslide-prone, but the model could not successfully capture them. In fact ,the precision is high because there is only 1 point which is predicts as a landslide: and that one turns out to be correct.
+
+
+###Full-fledged logistic regression
+
+Now let's add other variables. Would it improve the model?
+
+```{r landslide_glm}
+
+#Develop the landslide GLM with all variables from the training dataset
+g = glm(landslides ~ slope + cplan + cprof + norm_elev + log10_carea, data = df_train, family = binomial('logit'))
+
+#Predict the values on the test dataset
+pred = predict(g, newdata = df_test, type = "response")
+
+print('Landslide logistic regression:')
+
+#Print the confusion table.
+confusion_table <- table(as.factor(df_test$landslides == 1),as.factor(pred > 0.5), dnn=c("Observed","Predicted"))
+print.table(confusion_table)
+
+#Print accuracy, precision and recall.
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[1,2]), digits = 2)
+recall = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[2,1]), digits = 2)
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+```
+So with more variables, precision went slightly down: the model mistakenly labeled landslides on some points. But recall went up! This is a good, healthy model.
+
+### Are more variables better?
+
+Suppose we add a completely useless variable, one that repeats 1,1,1,1,1,2 in sequence. It has nothing to do with landslides.
+
+```{r new_column}
+
+#Add dummy variables to the datasets.
+df_train$trash <- rep(c(1,1,1,1,1,2), length.out = nrow(df_train))
+df_test$trash <- rep(c(1,1,1,1,1,2), length.out = nrow(df_test))
+
+#Uncomment to view.
+#View(df_train)
+
+#EXERCISE: develop the landslide GLM with all variables from the training dataset, including Trash. Look at the previous code block.
+g = 'EXERCISE'
+
+#Predict the values on the test dataset
+pred = predict(g, newdata = df_test, type = "response")
+
+#Print the confusion table.
+confusion_table <- table(as.factor(df_test$landslides == 1),as.factor(pred > 0.5), dnn=c("Observed","Predicted"))
+
+print('Landslide logistic regression:')
+
+print.table(confusion_table)
+
+accuracy = formatC((confusion_table[1,1] + confusion_table[2,2])/sum(confusion_table), digits = 2)
+precision = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[1,2]), digits = 2)
+recall = formatC((confusion_table[2,2])/(confusion_table[2,2] + confusion_table[2,1]), digits = 2)
+
+print(paste0('Accuracy:', accuracy))
+print(paste0('Precision:', precision))
+print(paste0('Recall:', recall))
+
+```
+
+Why did the precision increase with the addition of a useless variable? Think about it.
+
+
+# Conclusion
+
+In this R notebook, we have set up a landslide model based on terrain characteristics. We developed a logistic regression model with reasonable performance. We learnt about training and testing, and the dangers of more data.
+
+
+
