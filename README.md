@@ -14,12 +14,12 @@ This repository is part of the Tuesday May 21 hands-on AI/ML Basics Tutorial. Th
 
 ## Prerequisites
 
-Follow the steps from [system-setup](https://github.com/UR-Field-Labs/system-setup) to ensure you have all the necessary modules.
+Follow the steps from [system-setup](https://github.com/UR-Field-Labs/system-setup), listed below 1-4 to ensure you have all the necessary modules. Then follow the steps 5 and 6 to get the code and data for this workshop.
 1. Set up Github environment for code management (highly recommended if you will be working on coding projects, but not necessary).
 2. Set up QGIS for spatial data viewing.
 3. Set up R programming language.
 4. Set up python programming language (optional).
-5. Download the code to your local computer from either the [Github](https://github.com/UR-Field-Labs/landslide-ml-tutorial) (if you already have a GitHub account), or from the [Google Drive](https://drive.google.com/drive/folders/11XUSQZWQIefqJHMgMKilioeeH6wLqmzx?usp=drive_link).
+5. Download the code to your local computer from either [Github](https://github.com/UR-Field-Labs/landslide-ml-tutorial) (if you already have a GitHub account linked to the Field Lab organization), or from the [Google Drive](https://drive.google.com/drive/folders/11XUSQZWQIefqJHMgMKilioeeH6wLqmzx?usp=drive_link).
 6. (Specifically for generating susceptibility map) Download the *terrain* folder inside the data folder [here](https://drive.google.com/drive/folders/1l_BDZlnwOz8s2z7qVb9rNnJSR0NGSLPH?usp=drive_link) and put it in the *data* folder from the previous step. This folder is absent in the Github copy from Step 5 because of its size, so we download it separately.
 
 Also think about what you could do with this framework to pursue your own questions - a wildfire model, a pollution model, ... ...
