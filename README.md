@@ -20,6 +20,7 @@ Follow the steps from [system-setup](https://github.com/UR-Field-Labs/system-set
 3. Set up R programming language.
 4. Set up python programming language (optional).
 5. Download the code to your local computer from either the [Github](https://github.com/UR-Field-Labs/landslide-ml-tutorial) (if you already have a GitHub account), or from the [Google Drive](https://drive.google.com/drive/folders/11XUSQZWQIefqJHMgMKilioeeH6wLqmzx?usp=drive_link).
+6. (Specifically for generating susceptibility map) Download the *terrain* folder inside the data folder [here](https://drive.google.com/drive/folders/1l_BDZlnwOz8s2z7qVb9rNnJSR0NGSLPH?usp=drive_link) and put it in the *data* folder from the previous step. This folder is absent in the Github copy from Step 5 because of its size, so we download it separately.
 
 Also think about what you could do with this framework to pursue your own questions - a wildfire model, a pollution model, ... ...
 
