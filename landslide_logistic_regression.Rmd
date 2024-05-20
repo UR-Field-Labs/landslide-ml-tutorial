@@ -235,7 +235,7 @@ print(paste0('Recall:', recall))
 
 ```
 
-Why did the precision increase with the addition of a useless variable? Think about it.
+Why did the metrics increase with the addition of a useless variable? Think about it.
 
 
 # Conclusion
