@@ -33,7 +33,7 @@ There are certain exercises within the code. So make sure to do them.
 
 We then build a random forest model for landslides in Ecador. Open the [landslide_randomforest.Rmd](landslide_randomforest.Rmd) in RStudio and run each code block.
 
-A random forest model is a collection of decision trees. If you provide landslide input data and an indicator of landslide (yes/no), then a computer is capable of generating a decision tree to fit that data (e.g. if slope > 45, then landslide likely. If elevation > 1000 m then landslide likely...). A random forest is a collection of 100s of such decision trees. Given input data, the random forest asks each of its decision trees to gives its response, and then returns the popular vote (landslide yes/no).
+A random forest model is a collection of decision trees. If you provide landslide input data and an indicator of landslide (yes/no), then a computer is capable of generating a decision tree to fit that data (e.g. if slope > 45, then landslide likely. If elevation > 1000 m then landslide likely...). A random forest is a collection of hundreds of such decision trees. Given input data, the random forest asks each of its decision trees to give a response, and then returns the popular vote (landslide yes/no).
 
 Random Forests are one of the most versatile and robust machine learning models out there, and quite simple to build compared to the intense neural network models.
 
