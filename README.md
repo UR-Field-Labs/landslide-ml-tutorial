@@ -23,7 +23,7 @@ Also think about what you could do with this framework to pursue your own questi
 
 ## Logistic Regression Model for Landslides in Ecuador 
 
-We first learn about the basics of R and logistic regression as we build a model for landslides in Ecador. Open the [landslide_logistic_regression.Rmd](landslide_logistic_regression.Rmd) in RStudio and run each code block.
+We first learn about the basics of R and logistic regression as we build a model for landslides in Nepal. Open the [landslide_logistic_regression.Rmd](landslide_logistic_regression.Rmd) in RStudio and run each code block.
 
 Logistic regression is a simple model that, given certain inputs, provides the probability of landslide as an output. It estimates the probability by looking at patterns in the data. It is like drawing a line through data (regression), except the y variable is transformed to be a probability (between 0 and 1).
 
