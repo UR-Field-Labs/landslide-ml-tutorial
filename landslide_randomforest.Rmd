@@ -125,6 +125,7 @@ set.seed(10)
 
 #Depth of tree. The greater the depth, the more complex your decision trees are.
 max_depth = 10
+max_depth = 5
 
 #How many decision trees should be made?
 ntree = 1000
@@ -234,10 +235,10 @@ kde_raster = kde_raster/cellStats(kde_raster,'max')
 # Define the extent of the raster
 extent(kde_raster) <- extent(c(80.0884245137, 88.1748043151, 26.3978980576, 30.4227169866))
 crs(kde_raster) <- CRS("+proj=longlat +datum=WGS84")
-writeRaster(kde_raster, filename = "output/landslide_susceptibility.tif", format = "GTiff", overwrite = TRUE)
+writeRaster(kde_raster, filename = "landslide_susceptibility.tif", format = "GTiff", overwrite = TRUE)
 ```
 
-You can now open the output/landslide_susceptibility.tif in QGIS and decorate it!
+You can now open the landslide_susceptibility.tif in QGIS and decorate it!
 
 # Add more data to the random forest model
 
