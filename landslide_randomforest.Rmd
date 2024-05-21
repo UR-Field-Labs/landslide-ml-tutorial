@@ -191,8 +191,8 @@ cprof = raster(profile_curvature_file)
 cplan = raster(plan_curvature_file)
 carea = raster(flow_accumulation_file)
 
-#We reduce the resolution of the DEM by a factor of 5 to increase computation speed.
-dem = aggregate(dem, fact = 4, method = 'mean')
+#We reduce the resolution of the DEM by a factor of 10 to increase computation speed.
+dem = aggregate(dem, fact = 10, method = 'mean')
 
 full_df <- as.data.frame(dem, xy = TRUE)
 colnames(full_df) <- c('longitude', 'latitude', 'elev')
